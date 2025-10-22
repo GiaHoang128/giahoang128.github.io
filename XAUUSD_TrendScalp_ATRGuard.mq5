@@ -130,7 +130,8 @@ bool IsWithinSession()
 {
    if(!Use_Session_Filter) return true;
    datetime now = TimeCurrent();
-   int hour = TimeHour(now);
+   MqlDateTime dt; TimeToStruct(now, dt);
+   int hour = (int)dt.hour;
    if(Session_Start_Hour <= Session_End_Hour)
       return (hour >= Session_Start_Hour && hour < Session_End_Hour);
    // Overnight window (e.g., 22 -> 6)
