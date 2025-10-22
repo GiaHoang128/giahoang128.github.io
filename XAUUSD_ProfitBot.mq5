@@ -11,7 +11,7 @@
 #include <Trade/Trade.mqh>
 
 //============================== Inputs ==============================//
-input string InpSymbol                = "XAUUSD";     // Symbol (empty = current chart)
+input string InpSymbol                = "";           // Symbol (empty = current chart)
 input ENUM_TIMEFRAMES InpTF           = PERIOD_M5;    // Trading timeframe
 
 // Trend filters
@@ -37,9 +37,9 @@ input double BE_Trigger_ATR           = 0.8;          // Move SL to breakeven af
 input double Trail_ATR_Mult           = 1.0;          // Trailing distance = ATR * multiplier
 
 // Execution and filters
-input int    Max_Spread_Points        = 300;          // Maximum spread in points
+input int    Max_Spread_Points        = 2000;         // Maximum spread in points (looser default)
 input int    Slippage_Points          = 50;           // Max deviation in points
-input bool   Use_Session_Filter       = true;         // Restrict to trading session hours
+input bool   Use_Session_Filter       = false;        // Restrict to trading session hours
 input int    Session_Start_Hour       = 7;            // Start hour (server time)
 input int    Session_End_Hour         = 22;           // End hour (server time)
 input int    Max_Concurrent_Positions = 1;            // Max open positions for this symbol
@@ -49,10 +49,12 @@ input bool   One_Pos_Per_Direction    = true;         // Limit one per direction
 input double Daily_Loss_Limit_Pct     = 3.0;          // Disable trading after this daily loss
 input double Daily_Profit_Target_Pct  = 3.0;          // Stop for the day after this profit
 input int    Max_Daily_Trades         = 10;           // Max trades per day
+input bool   Disable_Daily_Guard      = false;        // Disable daily guard (testing only)
 
 // Misc
 input long   Magic_Number             = 20251022;     // Magic number
 input bool   Close_On_Opposite_Signal = true;         // Close when opposite signal appears
+input bool   Debug_Mode               = true;         // Enable debug logs/comment
 
 //=========================== Globals/State ==========================//
 CTrade        trade;
@@ -135,6 +137,12 @@ bool IsWithinSession()
    return (hour >= Session_Start_Hour || hour < Session_End_Hour);
 }
 
+void DebugPrint(const string msg)
+{
+   if(!Debug_Mode) return;
+   Print(msg);
+}
+
 bool IsSpreadAcceptable()
 {
    MqlTick tick;
@@ -158,6 +166,7 @@ void ResetDailyIfNeeded()
 
 bool DailyGuardAllowsTrading()
 {
+   if(Disable_Daily_Guard) return true;
    ResetDailyIfNeeded();
    if(g_disabledToday) return false;
 
@@ -457,24 +466,24 @@ bool OpenTrade(const bool isBuy)
 
 void TryEnter(const Signal &s)
 {
-   if(!DailyGuardAllowsTrading()) return;
-   if(!IsWithinSession()) return;
-   if(!IsSpreadAcceptable()) return;
+   if(!DailyGuardAllowsTrading()) { DebugPrint("[Skip] Daily guard active"); return; }
+   if(!IsWithinSession())        { DebugPrint("[Skip] Outside session"); return; }
+   if(!IsSpreadAcceptable())     { DebugPrint("[Skip] Spread too high"); return; }
 
    // Position limits
    int totalForSymbol = CountOpenPositions(g_symbol, Magic_Number, -1);
-   if(totalForSymbol >= Max_Concurrent_Positions) return;
+   if(totalForSymbol >= Max_Concurrent_Positions) { DebugPrint("[Skip] Max concurrent positions reached"); return; }
 
    if(s.buy)
    {
       if(One_Pos_Per_Direction && HasOpenPositionInDirection(g_symbol, Magic_Number, POSITION_TYPE_BUY))
-         return;
+      { DebugPrint("[Skip] Existing BUY position"); return; }
       OpenTrade(true);
    }
    if(s.sell)
    {
       if(One_Pos_Per_Direction && HasOpenPositionInDirection(g_symbol, Magic_Number, POSITION_TYPE_SELL))
-         return;
+      { DebugPrint("[Skip] Existing SELL position"); return; }
       OpenTrade(false);
    }
 }
@@ -517,6 +526,18 @@ void OnTick()
    if(!IsNewBar()) return;
 
    Signal s = GetSignal();
+   // Status overlay
+   if(Debug_Mode)
+   {
+      bool guardOk   = DailyGuardAllowsTrading();
+      bool sessOk    = IsWithinSession();
+      bool spreadOk  = IsSpreadAcceptable();
+      int  posCount  = CountOpenPositions(g_symbol, Magic_Number, -1);
+      Comment(StringFormat("%s\nGuard:%s Sess:%s Spread:%s Pos:%d\nSig B:%s S:%s",
+         g_symbol,
+         (guardOk?"OK":"BLOCK"), (sessOk?"OK":"NO"), (spreadOk?"OK":"HIGH"), posCount,
+         (s.buy?"Y":"-"), (s.sell?"Y":"-")));
+   }
    CloseOnOppositeIfNeeded(s);
    TryEnter(s);
 }
