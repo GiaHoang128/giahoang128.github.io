@@ -94,22 +94,16 @@ bool SelectSymbol(const string sym)
 
 bool UpdateSymbolInfo()
 {
-   if(!SymbolInfoInteger(g_symbol, SYMBOL_DIGITS, g_digits)) return false;
+   long digitsLong = 0;
+   if(!SymbolInfoInteger(g_symbol, SYMBOL_DIGITS, digitsLong)) return false;
+   g_digits = (int)digitsLong;
    if(!SymbolInfoDouble(g_symbol, SYMBOL_POINT, g_point)) return false;
    if(!SymbolInfoDouble(g_symbol, SYMBOL_TRADE_TICK_SIZE, g_tickSize)) return false;
    if(!SymbolInfoDouble(g_symbol, SYMBOL_TRADE_TICK_VALUE, g_tickValue)) return false;
    return true;
 }
 
-int ClampToVolumeStep(double lots)
-{
-   double minLot, maxLot, lotStep;
-   SymbolInfoDouble(g_symbol, SYMBOL_VOLUME_MIN, minLot);
-   SymbolInfoDouble(g_symbol, SYMBOL_VOLUME_MAX, maxLot);
-   SymbolInfoDouble(g_symbol, SYMBOL_VOLUME_STEP, lotStep);
-   double clamped = MathMax(minLot, MathMin(maxLot, MathFloor(lots/lotStep) * lotStep));
-   return (int)clamped; // Not used; keep for reference
-}
+// removed unused ClampToVolumeStep to avoid strict warnings
 
 double NormalizeVolume(double lots)
 {
@@ -358,7 +352,8 @@ void ManageOpenPositions()
          // Move SL to breakeven once in profit
          if(move > beTrigger)
          {
-            double newSL = MathMax(sl, priceOpen + (g_point*Max(1, (int)(Max_Spread_Points/2)))) ;
+            double minBufferPts = MathMax(1.0, (double)(Max_Spread_Points/2));
+            double newSL = MathMax(sl, priceOpen + g_point * minBufferPts);
             newSL = NormalizeDouble(newSL, g_digits);
             if(newSL > sl)
                trade.PositionModify(g_symbol, newSL, tp);
@@ -373,7 +368,8 @@ void ManageOpenPositions()
          double move = priceOpen - tick.ask;
          if(move > beTrigger)
          {
-            double newSL = MathMin(sl, priceOpen - (g_point*Max(1, (int)(Max_Spread_Points/2)))) ;
+            double minBufferPts = MathMax(1.0, (double)(Max_Spread_Points/2));
+            double newSL = MathMin(sl, priceOpen - g_point * minBufferPts);
             newSL = NormalizeDouble(newSL, g_digits);
             if(sl==0.0 || newSL < sl)
                trade.PositionModify(g_symbol, newSL, tp);
@@ -488,7 +484,7 @@ void TryEnter(const Signal &s)
 //=========================== MQL5 events ===========================//
 int OnInit()
 {
-   g_symbol = (InpSymbol==NULL || InpSymbol=="" ? _Symbol : InpSymbol);
+   g_symbol = (StringLen(InpSymbol)==0 ? _Symbol : InpSymbol);
    if(!SelectSymbol(g_symbol)) return INIT_FAILED;
    if(!UpdateSymbolInfo()) return INIT_FAILED;
    if(!CreateIndicators()) return INIT_FAILED;
