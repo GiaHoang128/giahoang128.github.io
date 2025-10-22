@@ -87,7 +87,7 @@ void ResetDayCounters()
 {
   dayStamp       = DateOfDay(TimeCurrent());
   dayStartEquity = AccountInfoDouble(ACCOUNT_EQUITY);
-  AllowNewTrades = true; // reset mỗi ngày
+  // AllowNewTrades sẽ được reset trong OnTick()
 }
 
 int PositionsTotalByMagic(string symbol,int magic)
@@ -122,7 +122,7 @@ int OnInit()
   hEMAfast = iMA(sym,TF,EMA_fast,0,MODE_EMA,PRICE_CLOSE);
   hEMAslow = iMA(sym,TF,EMA_slow,0,MODE_EMA,PRICE_CLOSE);
   hRSI     = iRSI(sym,TF,RSI_Period,PRICE_CLOSE);
-  hADX     = iADX(sym,TF,ADX_Period,PRICE_CLOSE);
+  hADX     = iADX(sym,TF,ADX_Period);
   hMACD    = iMACD(sym,TF,MACD_fast,MACD_slow,MACD_signal,PRICE_CLOSE);
   hATR     = iATR(sym,TF,ATR_Period);
 
@@ -497,7 +497,11 @@ void ManageTrailing()
 void OnTick()
 {
   // Day change?
-  if(DateOfDay(TimeCurrent()) != dayStamp) ResetDayCounters();
+  if(DateOfDay(TimeCurrent()) != dayStamp) 
+  {
+    ResetDayCounters();
+    AllowNewTrades = true; // reset mỗi ngày
+  }
 
   // Equity protections
   double equity = AccountInfoDouble(ACCOUNT_EQUITY);
@@ -541,7 +545,7 @@ void OnTick()
   double rsi  = GetBuffer(hRSI,0);
   double adx  = GetIndicatorADX(0);
 
-  if(emaF==EMPTY_VALUE || emaS==EMPTY_VALUE || rsi==EMPTY_VALUE || adx==0) return;
+  if(emaF==EMPTY_VALUE || emaS==EMPTY_VALUE || rsi==EMPTY_VALUE || adx<=0) return;
 
   double macd_main0, macd_signal0, macd_main1, macd_signal1;
   if(!GetMACD(macd_main0,macd_signal0,macd_main1,macd_signal1)) return;
