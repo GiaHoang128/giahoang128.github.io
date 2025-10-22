@@ -53,7 +53,6 @@ input int     MACD_signal           = 9;
 //==== Inputs: Filters =========================================================
 input bool    TradeLong             = true;
 input bool    TradeShort            = true;
-bool    AllowNewTrades        = true;     // sẽ tự OFF khi đạt target
 input bool    AvoidHighSpread       = true;
 
 //==== Inputs: Breakout Pending Orders ========================================
@@ -75,6 +74,7 @@ int     hEMAfast=-1, hEMAslow=-1, hRSI=-1, hADX=-1, hMACD=-1, hATR=-1;
 double  dayStartEquity=0.0;
 datetime dayStamp=0;
 int     consecLosses=0;
+bool    AllowNewTrades = true;     // sẽ tự OFF khi đạt target
 
 //------------------------------------------------------------------------------
 // Utility
